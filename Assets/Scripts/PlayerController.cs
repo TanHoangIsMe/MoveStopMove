@@ -1,5 +1,6 @@
 using System.Collections;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 public class PlayerController : MonoBehaviour
 {
@@ -8,16 +9,22 @@ public class PlayerController : MonoBehaviour
     [SerializeField] private AnimationController animationController;
     [SerializeField] private float speed;
     [SerializeField] private WeaponController weapon;
+    [SerializeField] private Transform character;
+    [SerializeField] private Transform attackZone;
+    [SerializeField] private GameObject shell;
 
     private float moveHorizontal;
     private float moveVertical;
     private Vector3 direction;
-    private State currentState = State.Idle;
+    public State currentState = State.Idle;
     private bool isRunning = false;
-    private GameObject lockedTarget;
+    public GameObject lockedTarget;
+    private int currentKill = 0;
 
     private void FixedUpdate()
     {
+        if (currentState == State.Win || currentState == State.Dead) return;
+
         // get joystick input value
         moveHorizontal = joystick.Horizontal;
         moveVertical = joystick.Vertical;
@@ -67,6 +74,7 @@ public class PlayerController : MonoBehaviour
 
     private void OnTriggerEnter(Collider other)
     {
+        if (currentState == State.Win || currentState == State.Dead) return;
         if (lockedTarget != null) return;
 
         if (other.CompareTag("Target"))
@@ -79,6 +87,7 @@ public class PlayerController : MonoBehaviour
 
     private void OnTriggerStay(Collider other)
     {
+        if (currentState == State.Win || currentState == State.Dead) return;
         if (other.CompareTag("Target") && lockedTarget == null)
         {
             GameObject target = other.transform.parent.gameObject;
@@ -89,14 +98,14 @@ public class PlayerController : MonoBehaviour
 
     private void OnTriggerExit(Collider other)
     {
+        if (currentState == State.Win || currentState == State.Dead) return;
         if (!other.CompareTag("Target")) return;
-        if (other.transform.parent.gameObject == lockedTarget)
-            Debug.Log("out");
-        GameObject targetLock = other.transform.parent.gameObject.transform.GetChild(1).gameObject;
-        if (targetLock == null || !targetLock.activeSelf) return;
-
-        targetLock.SetActive(false);
-        lockedTarget = null;
+        GameObject target = other.transform.parent.gameObject;
+        if (target == lockedTarget)
+        {
+            target.transform.GetChild(1).gameObject.SetActive(false);
+            lockedTarget = null;
+        }
     }
 
     private IEnumerator Attack()
@@ -115,5 +124,42 @@ public class PlayerController : MonoBehaviour
         yield return new WaitForSeconds(2f);
 
         isRunning = false;
+    }
+
+    public void HandleKill()
+    {
+        lockedTarget = null;
+        currentKill ++;
+        
+        if(currentKill % 3 == 0)
+        {
+            character.localScale += new Vector3(0.2f, 0.2f, 0.2f);
+            attackZone.localScale += new Vector3(0.2f, 0f, 0.2f);
+        }
+    }
+
+    public void HandleDeath()
+    {
+        lockedTarget = null;
+        shell.SetActive(false);
+        attackZone.gameObject.SetActive(false);
+        currentState = State.Dead;
+        animationController.PlayDeathAnimation();
+        Invoke("DeActiveObject", 2f);
+    }
+
+    private void DeActiveObject()
+    {
+        gameObject.SetActive(false);
+        SceneManager.LoadScene(0);
+    }
+
+    public void HandleWin()
+    {
+        if (currentState == State.Dead) return;
+
+        currentState = State.Win;
+        rb.transform.rotation = Quaternion.LookRotation(Vector3.back);
+        animationController.PlayWinAnimation();
     }
 }

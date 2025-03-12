@@ -27,4 +27,15 @@ public class AnimationController : MonoBehaviour
         animator.SetBool("IsWin", false);
         animator.SetBool("IsUlti", false);
     }
+
+    public void PlayDeathAnimation() 
+    {
+        animator.SetBool("IsDead", true);
+    }
+
+    public void PlayWinAnimation()
+    {
+        animator.SetBool("IsWin", true);
+        animator.SetBool("IsDead", false);
+    }
 }

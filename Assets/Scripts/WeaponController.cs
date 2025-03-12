@@ -1,14 +1,23 @@
 using UnityEngine;
 using System.Collections;
-using UnityEngine.AI;
 
 public class WeaponController : MonoBehaviour
 {
+    [SerializeField] GameObject owner;
     [SerializeField] private float speed = 5f;      
     [SerializeField] private float spinSpeed = 360f;
 
     private Vector3 startPoint;
     public Vector3 endPoint;
+
+    private EnemyController enemyController;
+    private PlayerController playerController;
+
+    private void Awake()
+    {
+        enemyController = owner.GetComponent<EnemyController>();
+        playerController = owner.GetComponent<PlayerController>();
+    }
 
     private void OnEnable()
     {
@@ -37,12 +46,19 @@ public class WeaponController : MonoBehaviour
 
     private void OnTriggerEnter(Collider other)
     {
-        if (other.CompareTag("Target"))
+        if (other.CompareTag("Target") && other.transform.parent.gameObject != owner)
         {
-            Debug.Log(other.transform.parent.gameObject.name);
+            if (playerController != null) playerController.HandleKill();
+            else enemyController.HandleKill();
 
-            //target.GetComponent<NavMeshAgent>().isStopped = true;
-            //target.SetActive(false);
+            EnemyController enemy = other.transform.parent.GetComponent<EnemyController>();
+            if(enemy != null) enemy.HandleDeath();
+            else other.transform.parent.GetComponent<PlayerController>().HandleDeath();
+
+            if(GameplayController.instance != null)
+                GameplayController.instance.CheckWinCondition();
+
+            gameObject.SetActive(false);
         }
     }
 }

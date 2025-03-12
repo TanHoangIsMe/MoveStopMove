@@ -6,6 +6,7 @@ public class ObjectPooling : MonoBehaviour
     [SerializeField] private GameObject enemyPrefab;
     [SerializeField] private int poolSize;
     [SerializeField] private Transform ground;
+    [SerializeField] private Transform player;
 
     private List<GameObject> pool;
 
@@ -41,11 +42,27 @@ public class ObjectPooling : MonoBehaviour
         }
     }
 
+    public void DeActiveAll()
+    {
+        foreach (GameObject obj in pool)
+            if(obj.activeSelf)
+                obj.GetComponent<EnemyController>().HandleEndGame();
+    }
+
     private Vector3 GetRandomPosition()
     {
-        float randomX = Random.Range(minX, maxX);
-        float randomZ = Random.Range(minZ, maxZ);
-        Vector3 spawnPosition = new Vector3(randomX, 0f, randomZ);
-        return spawnPosition;
+        float safeDistance = 5f; 
+        Vector3 playerPosition = player.position;
+        Vector3 spawnPosition;
+
+        while (true)
+        {
+            float randomX = Random.Range(minX, maxX);
+            float randomZ = Random.Range(minZ, maxZ);
+            spawnPosition = new Vector3(randomX, 0f, randomZ);
+
+            if (Vector3.Distance(spawnPosition, playerPosition) >= safeDistance)
+                return spawnPosition;
+        }
     }
 }

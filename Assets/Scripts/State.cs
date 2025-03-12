@@ -2,5 +2,7 @@ public enum State
 {
     Idle,
     Run,
-    Attack
+    Attack,
+    Dead,
+    Win
 }

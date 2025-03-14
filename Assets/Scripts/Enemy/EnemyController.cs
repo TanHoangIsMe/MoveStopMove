@@ -1,6 +1,7 @@
 using UnityEngine;
 using System.Collections;
 using UnityEngine.AI;
+using TMPro;
 
 public class EnemyController : MonoBehaviour
 {
@@ -13,18 +14,27 @@ public class EnemyController : MonoBehaviour
     [SerializeField] private GameObject shell;
     [SerializeField] private Transform character;
     [SerializeField] private Transform attackZone;
+    [SerializeField] private GameObject billboard;
+    [SerializeField] private TextMeshProUGUI killText;
 
     private State currentState = State.Idle;
     private bool canMove = true;
     private bool isRunning = false;
     public GameObject lockedTarget;
+    public GameObject onHandWeapon;
     private int currentKill = 0;
+    private float countdown = 2f;
+    private float timeInAttackZone;
 
     private void OnEnable()
     {
+        if (IndicatorsManager.Instance != null) IndicatorsManager.Instance.RegisterEnemy(transform);
+        DeathController.OnEnemyDeath += HandleEnemyDeath;
         currentState = State.Idle;
         isRunning = false;
         weapon.gameObject.SetActive(false);
+        onHandWeapon.SetActive(true);
+        billboard.SetActive(true);
         shell.SetActive(true);
         canMove = true;
         agent.isStopped = false;
@@ -33,9 +43,16 @@ public class EnemyController : MonoBehaviour
         InvokeRepeating(nameof(MoveToRandomPosition), 0f, 5f);
     }
 
+    private void OnDisable()
+    {
+        if (IndicatorsManager.Instance != null) IndicatorsManager.Instance.UnregisterEnemy(transform);
+        DeathController.OnEnemyDeath -= HandleEnemyDeath;
+    }
+
     private void FixedUpdate()
     {
         if (currentState == State.Dead) return;
+        if (currentState == State.Attack) return;
 
         if (!agent.pathPending && agent.remainingDistance <= agent.stoppingDistance)
         {
@@ -47,6 +64,19 @@ public class EnemyController : MonoBehaviour
                     animationController.PlayIdleAnimation();
                     currentState = State.Idle;
                 }
+            }
+        }
+
+        if (isRunning)
+        {
+            countdown -= Time.deltaTime;
+
+            if (countdown <= 0)
+            {
+                onHandWeapon.SetActive(true);
+                isRunning = false;
+                currentState = State.Idle;
+                countdown = 2f;
             }
         }
     }
@@ -92,12 +122,9 @@ public class EnemyController : MonoBehaviour
 
             canMove = false;
             agent.isStopped = true;
-            if (currentState != State.Idle)
-            {
-                // play idle animation
-                animationController.PlayIdleAnimation();
-                currentState = State.Idle;
-            }
+            currentState = State.Idle;
+            animationController.PlayIdleAnimation();
+            timeInAttackZone = 0f;
         }
     }
 
@@ -105,28 +132,11 @@ public class EnemyController : MonoBehaviour
     {
         if (currentState == State.Dead) return;
 
-        if (other.CompareTag("Target") && lockedTarget != null && isRunning)
-        {
-            if (currentState != State.Idle)
-            {
-                // play idle animation
-                animationController.PlayIdleAnimation();
-                currentState = State.Idle;
-            }
-        }
-
         if (other.CompareTag("Target") && lockedTarget != null && !isRunning)
         {
-            Vector3 targetDirection =
-                    new Vector3(
-                        lockedTarget.transform.position.x - transform.position.x,
-                        0f,
-                        lockedTarget.transform.position.z - transform.position.z);
+            timeInAttackZone += Time.deltaTime; 
 
-            targetDirection = targetDirection.normalized;
-            rb.transform.rotation = Quaternion.LookRotation(targetDirection);
-
-            StartCoroutine(Attack());
+            if (timeInAttackZone >= 0.5f) StartCoroutine(Attack());
         }
 
         if (other.CompareTag("Target") && lockedTarget == null)
@@ -141,31 +151,45 @@ public class EnemyController : MonoBehaviour
         if (currentState == State.Dead) return;
 
         if (!other.CompareTag("Target")) return;
+
         if (other.transform.parent.gameObject == lockedTarget)
-        {
-            lockedTarget = null;
-            canMove = true;
-            agent.isStopped = false;
-            agent.ResetPath();
-        }
+            StartCoroutine(ClearTargetAfterDelay());
+    }
+
+    private IEnumerator ClearTargetAfterDelay()
+    {
+        yield return new WaitForSeconds(0.2f); 
+        lockedTarget = null;
+        canMove = true;
+        agent.isStopped = false;
+        agent.ResetPath();
+        timeInAttackZone = 0f;
     }
 
     private IEnumerator Attack()
     {
-        isRunning = true;
-
         animationController.PlayAttackAnimation();
         currentState = State.Attack;
 
+        Vector3 targetDirection =
+                    new Vector3(
+                        lockedTarget.transform.position.x - transform.position.x,
+                        0f,
+                        lockedTarget.transform.position.z - transform.position.z);
+
+        targetDirection = targetDirection.normalized;
+        rb.transform.rotation = Quaternion.LookRotation(targetDirection);
+
+        yield return new WaitForSeconds(0.12f);
+
         if (!weapon.gameObject.activeSelf)
         {
+            isRunning = true;
+            onHandWeapon.SetActive(false);
+
             weapon.endPoint = lockedTarget.transform.position;
             weapon.gameObject.SetActive(true);
         }
-
-        yield return new WaitForSeconds(2f);
-
-        isRunning = false;
     }
 
     public void HandleKill()
@@ -173,6 +197,7 @@ public class EnemyController : MonoBehaviour
         targetLockUI.SetActive(false);
         lockedTarget = null;
         currentKill++;
+        killText.text = currentKill.ToString();
 
         if (currentKill % 3 == 0)
         {
@@ -181,9 +206,16 @@ public class EnemyController : MonoBehaviour
         }
     }
 
+    private void HandleEnemyDeath(EnemyController deadEnemy)
+    {
+        if (lockedTarget != null && deadEnemy == lockedTarget)
+            lockedTarget = null;
+    }
+
     public void HandleDeath()
     {
         ResetValues();
+        DeathController.NotifyEnemyDeath(this);
         currentState = State.Dead;
         animationController.PlayDeathAnimation();
         Invoke("DeActiveObject", 2f);
@@ -200,8 +232,9 @@ public class EnemyController : MonoBehaviour
         targetLockUI.SetActive(false);
         canMove = false;
         agent.isStopped = true;
-        lockedTarget = null;
         shell.SetActive(false);
+        onHandWeapon.SetActive(false);
+        billboard.SetActive(false);
     }
 
     private void DeActiveObject()

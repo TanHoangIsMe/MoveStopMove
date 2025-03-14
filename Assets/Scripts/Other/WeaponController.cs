@@ -9,6 +9,8 @@ public class WeaponController : MonoBehaviour
 
     private Vector3 startPoint;
     public Vector3 endPoint;
+    private float fixedDistance = 5f;
+    private Vector3 direction;
 
     private EnemyController enemyController;
     private PlayerController playerController;
@@ -22,7 +24,10 @@ public class WeaponController : MonoBehaviour
     private void OnEnable()
     {
         startPoint = transform.parent.position + Vector3.up * 1.5f;
+        direction = (endPoint - startPoint).normalized;
+        endPoint = startPoint + direction * fixedDistance;
         endPoint += Vector3.up * 1.5f;
+
         StartCoroutine(MoveAndSpin());
     }
 

@@ -1,12 +1,13 @@
 using System.Collections.Generic;
 using UnityEngine;
 
-public class ObjectPooling : MonoBehaviour
+public class EnemyPooling : MonoBehaviour
 {
     [SerializeField] private GameObject enemyPrefab;
     [SerializeField] private int poolSize;
     [SerializeField] private Transform ground;
     [SerializeField] private Transform player;
+    [SerializeField] private Transform container;
 
     private List<GameObject> pool;
 
@@ -25,6 +26,7 @@ public class ObjectPooling : MonoBehaviour
         for (int i = 0; i < poolSize; i++)
         {
             GameObject enemy = Instantiate(enemyPrefab, GetRandomPosition(), Quaternion.identity);
+            enemy.transform.SetParent(container);
             pool.Add(enemy);
         }
     }

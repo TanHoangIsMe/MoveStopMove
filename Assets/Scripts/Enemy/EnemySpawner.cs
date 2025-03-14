@@ -3,7 +3,7 @@ using UnityEngine;
 
 public class EnemySpawner : MonoBehaviour
 {
-    [SerializeField] private ObjectPooling objectPooling;
+    [SerializeField] private EnemyPooling enemyPooling;
 
     public bool isEndGame = false;
     private Coroutine spawnCoroutine;
@@ -18,7 +18,7 @@ public class EnemySpawner : MonoBehaviour
         while (!isEndGame)
         {
             yield return new WaitForSeconds(3f);
-            objectPooling.ActiveEnemy();
+            enemyPooling.ActiveEnemy();
         }
     }
 
@@ -29,7 +29,7 @@ public class EnemySpawner : MonoBehaviour
         if (spawnCoroutine != null)
         {
             StopCoroutine(spawnCoroutine);
-            objectPooling.DeActiveAll();
+            enemyPooling.DeActiveAll();
         }
     }
 }
